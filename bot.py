@@ -60,14 +60,31 @@ SUPPORTED_REACTIONS = frozenset(REACTIONS)
 FAVORITES = ("👍", "❤", "🔥", "👏", "🎉", "😍", "🥰", "💘", "🤩", "😁", "💯", "😎", "👀", "🙏")
 # Community-reported 🎉 message effect. May change or be unavailable; GIF is the fallback.
 DEFAULT_CELEBRATION_EFFECT_ID = "5046509860389126442"
+# Style fixed headings and button labels only. Keep HTML tags, commands,
+# callback data, user-provided names, usernames and IDs in their original form.
+_SMALL_CAPS = "ᴀʙᴄᴅᴇꜰɢʜɪᴊᴋʟᴍɴᴏᴘꞯʀꜱᴛᴜᴠᴡxʏᴢ"
+_UI_STYLE = str.maketrans(
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
+    "".join(chr(0x1D400 + index) for index in range(26)) + _SMALL_CAPS,
+)
+
+
+def style_ui_label(text: str) -> str:
+    """Turn fixed Latin UI labels into bold capitals and small-cap lowercase."""
+    return text.translate(_UI_STYLE)
+
+
 # IDs supplied by the user. These decorate bot messages; they are NOT reaction counts.
 CELEBRATION_RICH = (
     '<tg-emoji emoji-id="5397672154651181662">🤩</tg-emoji> '
     '<tg-emoji emoji-id="5397672154651181662">🤩</tg-emoji> '
     '<tg-emoji emoji-id="5454365533979825405">✈️</tg-emoji> '
-    "<b>Membership verified!</b> 🎉\nSab channels join ho gaye. Welcome!"
+    f"<b>{style_ui_label('Membership verified!')}</b> 🎉\nYou've joined every required channel. Welcome!"
 )
-CELEBRATION_PLAIN = "🤩 🤩 ✈️ <b>Membership verified!</b> 🎉\nSab channels join ho gaye. Welcome!"
+CELEBRATION_PLAIN = (
+    f"🤩 🤩 ✈️ <b>{style_ui_label('Membership verified!')}</b> 🎉\n"
+    "You've joined every required channel. Welcome!"
+)
 STARS_PRICE = 100
 PREMIUM_DAYS = 30
 MAX_CHILD_BOTS = 5
@@ -120,6 +137,11 @@ def reaction_from_token(token: str, main_emoji: str):
 
 def multi_label(token: str, main_emoji: str) -> str:
     return f"{main_emoji} (main)" if token == "main" else token
+
+
+def multi_button_label(token: str, main_emoji: str) -> str:
+    """Style only the fixed label; keep custom IDs and reaction tokens intact."""
+    return f"{main_emoji} ({style_ui_label('main')})" if token == "main" else token
 
 
 def command_multi_args(message: object, args: list[str]) -> list[str]:
@@ -839,16 +861,16 @@ async def require_access(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         [InlineKeyboardButton("🔗 " + short_title(row["title"]), url=row["join_url"])]
         for row in join_rows
     ]
-    buttons.append([InlineKeyboardButton("✅ Join All — Check Membership", callback_data="verify")])
+    buttons.append([InlineKeyboardButton(style_ui_label("✅ Join All — Check Membership"), callback_data="verify")])
     text = (
-        "<b>🔐 Required channels</b>\n\n"
-        "Neeche diye gaye channel(s) ko khud join karein. Sab join karne ke baad "
-        "<b>Check Membership</b> dabayein."
+        f"<b>{style_ui_label('🔐 Required channels')}</b>\n\n"
+        "Join the channels listed below yourself. Once you have joined them all, "
+        "tap <b>Check Membership</b>."
     )
     if unavailable:
         text += (
-            "\n\n⚠️ Kuch channels ki membership verify nahi ho rahi. "
-            "Owner ko un channels mein bot ka admin access check karna hoga."
+            "\n\n⚠️ Membership could not be checked for some channels. "
+            "The owner must check this bot's admin access in those channels."
         )
     await render(update, context, text, buttons)
     return False
@@ -856,16 +878,16 @@ async def require_access(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 def dashboard_buttons(owner: bool) -> list[list[InlineKeyboardButton]]:
     rows = [
-        [InlineKeyboardButton("➕ Set Channel", callback_data="add")],
+        [InlineKeyboardButton(style_ui_label("➕ Set Channel"), callback_data="add")],
         [
-            InlineKeyboardButton("📋 My Channels", callback_data="channels"),
-            InlineKeyboardButton("🎭 Set Reaction", callback_data="reactionmenu"),
+            InlineKeyboardButton(style_ui_label("📋 My Channels"), callback_data="channels"),
+            InlineKeyboardButton(style_ui_label("🎭 Set Reaction"), callback_data="reactionmenu"),
         ],
-        [InlineKeyboardButton("⭐ Premium · Multi React", callback_data="premium")],
-        [InlineKeyboardButton("❓ Help", callback_data="help")],
+        [InlineKeyboardButton(style_ui_label("⭐ Premium · Multi React"), callback_data="premium")],
+        [InlineKeyboardButton(style_ui_label("❓ Help"), callback_data="help")],
     ]
     if owner:
-        rows.append([InlineKeyboardButton("👑 Owner Panel", callback_data="owner")])
+        rows.append([InlineKeyboardButton(style_ui_label("👑 Owner Panel"), callback_data="owner")])
     return rows
 
 
@@ -875,48 +897,47 @@ async def show_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await render(
         update,
         context,
-        "<b>✨ Channel Reaction Bot</b>\n\n"
-        f"Welcome! Aapke linked channels: <b>{total}</b>.\n"
-        "Free: main bot har <b>naye</b> post par apna <b>ek</b> reaction "
-        "try karta hai. Premium + five child-bot admins hon to "
-        "paanch extra <b>bot</b> reactions (alag allowed emojis bhi) "
-        "try kiye ja sakte hain.\n\n"
-        "Channel jodne ke liye <b>Set Channel</b> dabayein.",
+        f"<b>{style_ui_label('✨ Channel Reaction Bot')}</b>\n\n"
+        f"Welcome! Your linked channels: <b>{total}</b>.\n"
+        "Free: the main bot tries <b>one</b> reaction on each <b>new</b> post. "
+        "With Premium and five child bots set as admins, up to five additional "
+        "<b>bot</b> reactions can be tried, each with its own allowed emoji.\n\n"
+        "Tap <b>Set Channel</b> to link a channel.",
         dashboard_buttons(uid == services(context).settings.owner_id),
     )
 
 
 async def show_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = (
-        "<b>📖 Commands</b>\n\n"
-        "/start — dashboard / membership check\n"
-        "/setchannel — bot ko channel admin banakar us channel ki post forward karein\n"
-        "/mychannels — linked channels / controls\n"
-        "/setreaction 🔥 — emoji choose karein (multiple channels hon to channel choose karein)\n"
-        "/setreaction -1001234567890 👍 — specific channel\n"
-        "/pause [channel_id] — auto reaction band\n"
-        "/resume [channel_id] — auto reaction chalu\n"
-        "/removechannel [channel_id] — channel unlink\n"
-        "/premium — 100 Stars / 30 din Premium status/offer\n"
-        "/childbots — five owner-managed child bots ke usernames\n"
-        "/setmulti — Premium ke 5 child bots ke emojis/custom IDs set karein\n"
-        "/setmulti 😍 ❤️ 🥰 🤩 💘 — ek linked channel mein 5 alag emojis\n"
-        "/multireact CHANNEL_ID — five child bots enable (Premium only)\n"
-        "/multireact off CHANNEL_ID — child bots disable\n"
-        "/terms — payment terms; /support — help/refund\n"
-        "/whoami — apni Telegram user ID\n\n"
-        "⚠️ Har bot apni taraf se maximum ek reaction laga sakta hai. "
-        "Child bot reactions asli users ke reactions nahi hain."
+        f"<b>{style_ui_label('📖 Commands')}</b>\n\n"
+        "/start — dashboard and membership check\n"
+        "/setchannel — make the bot a channel admin, then forward a channel post\n"
+        "/mychannels — linked channels and controls\n"
+        "/setreaction 🔥 — choose an emoji; select a channel if you have several\n"
+        "/setreaction -1001234567890 👍 — choose an emoji for a specific channel\n"
+        "/pause [channel_id] — pause automatic reactions\n"
+        "/resume [channel_id] — resume automatic reactions\n"
+        "/removechannel [channel_id] — unlink a channel\n"
+        "/premium — Premium status and 100 Stars / 30-day offer\n"
+        "/childbots — usernames of the five owner-managed child bots\n"
+        "/setmulti — set the five child bots' emojis or custom IDs\n"
+        "/setmulti 😍 ❤️ 🥰 🤩 💘 — five separate emojis for one linked channel\n"
+        "/multireact CHANNEL_ID — enable five child bots (Premium only)\n"
+        "/multireact off CHANNEL_ID — disable the child bots\n"
+        "/terms — purchase terms; /support — help or refunds\n"
+        "/whoami — your Telegram user ID\n\n"
+        "⚠️ Each bot can add at most one of its own reactions per post. "
+        "Child-bot reactions are not reactions from real users."
     )
     if update.effective_user.id == services(context).settings.owner_id:
         text += (
-            "\n\n<b>Owner:</b> /addforce @channel, "
+            f"\n\n<b>{style_ui_label('Owner:')}</b> /addforce @channel, "
             "/addforce -1001234567890 https://t.me/+invite, "
             "/forces, /delforce @channel, /seteffect, /effecttest, /stats, "
             "/grantpremium USER_ID [days], /revokepremium USER_ID, "
             "/refundstars CHARGE_ID, /reply USER_ID message"
         )
-    await render(update, context, text, [[InlineKeyboardButton("⬅️ Home", callback_data="home")]])
+    await render(update, context, text, [[InlineKeyboardButton(style_ui_label("⬅️ Home"), callback_data="home")]])
 
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -930,7 +951,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_whoami(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await render(update, context, f"Aapki Telegram user ID: <code>{update.effective_user.id}</code>")
+    await render(update, context, f"Your Telegram user ID: <code>{update.effective_user.id}</code>")
 
 
 async def show_premium(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -942,20 +963,20 @@ async def show_premium(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         else f"✅ Active until {esc(expires_text(until))}" if premium_active(context, uid)
         else "🔒 Not active"
     )
-    buttons = [[InlineKeyboardButton("🤖 Child Bot List", callback_data="childbots")]]
+    buttons = [[InlineKeyboardButton(style_ui_label("🤖 Child Bot List"), callback_data="childbots")]]
     if loaded == MAX_CHILD_BOTS and uid != services(context).settings.owner_id:
-        buttons.append([InlineKeyboardButton("⭐ Buy 100 Stars / 30 days", callback_data="premium_terms")])
+        buttons.append([InlineKeyboardButton(style_ui_label("⭐ Buy 100 Stars / 30 days"), callback_data="premium_terms")])
     buttons.extend([
-        [InlineKeyboardButton("📋 My Channels", callback_data="channels")],
-        [InlineKeyboardButton("🏠 Home", callback_data="home")],
+        [InlineKeyboardButton(style_ui_label("📋 My Channels"), callback_data="channels")],
+        [InlineKeyboardButton(style_ui_label("🏠 Home"), callback_data="home")],
     ])
     await render(
         update, context,
-        "<b>😍 Multi-Bot Premium</b>\n\n"
+        f"<b>{style_ui_label('😍 Multi-Bot Premium')}</b>\n\n"
         f"Status: {status}\nChild bots available: <b>{loaded}/{MAX_CHILD_BOTS}</b>\n\n"
         "⭐ One-time <b>100 Telegram Stars / 30 days</b> (not auto-renewed). "
-        "Premium lets you switch on up to five EXTRA owner-managed bots per linked channel. "
-        "Aap 5 bots ko alag supported emojis ya permitted custom emoji IDs assign kar sakte hain. "
+        "Premium lets you switch on up to five extra owner-managed bots per linked channel. "
+        "You can give each child bot a different supported emoji or permitted custom emoji ID. "
         "Each bot can add at most one of its own reactions; these are <b>bot reactions, "
         "not real member reactions</b>. All five must be admins in the channel.\n\n"
         + ("⚠️ Payment disabled until owner has configured five working child bots."
@@ -973,11 +994,11 @@ async def show_terms(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     ready = len(children(context)) == MAX_CHILD_BOTS
     buttons = []
     if ready:
-        buttons.append([InlineKeyboardButton("✅ I agree — send 100⭐ invoice", callback_data="premium_buy")])
-    buttons.append([InlineKeyboardButton("⬅️ Premium", callback_data="premium")])
+        buttons.append([InlineKeyboardButton(style_ui_label("✅ I agree — send 100⭐ invoice"), callback_data="premium_buy")])
+    buttons.append([InlineKeyboardButton(style_ui_label("⬅️ Premium"), callback_data="premium")])
     await render(
         update, context,
-        "<b>📜 Premium purchase terms</b>\n\n"
+        f"<b>{style_ui_label('📜 Premium purchase terms')}</b>\n\n"
         "Price: <b>100 Telegram Stars</b> for <b>30 days</b>, one-time; "
         "it will not renew automatically. Re-purchasing adds 30 days.\n\n"
         "The service provides up to <b>5 additional BOT reactions</b> per new channel post "
@@ -1007,17 +1028,18 @@ async def show_childbots(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         [InlineKeyboardButton(f"🤖 @{child.username}", url=f"https://t.me/{child.username}")]
         for child in bots
     ]
-    buttons.append([InlineKeyboardButton("⬅️ Premium", callback_data="premium")])
+    buttons.append([InlineKeyboardButton(style_ui_label("⬅️ Premium"), callback_data="premium")])
     await render(
         update, context,
-        f"<b>🤖 Owner-managed child bots ({len(bots)}/{MAX_CHILD_BOTS})</b>\n\n"
-        "Channel → Manage → Administrators → Add Admin: saare child bot usernames "
-        "add karein. Main bot bhi admin rehna chahiye. Kisi user ko bot tokens "
-        "bhejne ki zaroorat nahi.\n\n"
-        "Apne linked channel ke Settings → <b>5 Extra Emojis</b> se har bot ka emoji "
-        "choose karein; phir <b>Enable Multi React</b> dabayein "
-        "ya <code>/multireact CHANNEL_ID</code> bhejein. Owner ne paanch bots "
-        "configure nahi kiye to paid checkout unavailable hoga.",
+        f"<b>{style_ui_label('🤖 Owner-managed child bots')} "
+        f"({len(bots)}/{MAX_CHILD_BOTS})</b>\n\n"
+        "In your channel, open Manage → Administrators → Add Admin and add all five "
+        "child bots by username. The main bot must also stay an admin. "
+        "Never share bot tokens with users.\n\n"
+        "In your linked channel's Settings, open <b>5 Extra Emojis</b> to choose "
+        "a reaction for each child bot. Then tap <b>Enable Multi React</b> or send "
+        "<code>/multireact CHANNEL_ID</code>. Paid checkout stays unavailable "
+        "until the owner has configured all five bots.",
         buttons,
     )
 
@@ -1030,7 +1052,7 @@ async def cmd_childbots(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 async def send_premium_invoice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     uid = update.effective_user.id
     if len(children(context)) != MAX_CHILD_BOTS:
-        await render(update, context, "⚠️ Five child bots online nahi hain; Stars charge nahi kiye jayenge.")
+        await render(update, context, "⚠️ All five child bots must be online. No Stars will be charged.")
         return
     now = int(time.time())
     services(context).store.accept_terms(uid, TERMS_VERSION, now)
@@ -1039,7 +1061,7 @@ async def send_premium_invoice(update: Update, context: ContextTypes.DEFAULT_TYP
     try:
         await context.bot.send_invoice(
             chat_id=uid,
-            title="30-day Multi-Bot Premium (up to 5 extra bots)",
+            title=style_ui_label("30-Day Premium · 5 Bots"),
             description=(
                 "One-time 100 Stars; 30 days after payment. "
                 "Up to five owner bots, each with its own allowed emoji/custom ID; "
@@ -1048,14 +1070,14 @@ async def send_premium_invoice(update: Update, context: ContextTypes.DEFAULT_TYP
             payload=payload,
             provider_token="",
             currency="XTR",
-            prices=[LabeledPrice("30-day Premium", STARS_PRICE)],
+            prices=[LabeledPrice(style_ui_label("30-day Premium"), STARS_PRICE)],
             start_parameter="premium30",
         )
     except TelegramError:
-        await render(update, context, "⚠️ Invoice nahi bhej paya. Stars charge nahi hue. Dobara try karein.")
+        await render(update, context, "⚠️ Could not send the invoice. No Stars were charged. Please try again.")
         return
     if update.callback_query:
-        await render(update, context, "✅ Terms accepted; 100⭐ invoice neeche bheja gaya hai.")
+        await render(update, context, "✅ Terms accepted. The 100⭐ invoice has been sent below.")
 
 
 async def cmd_buy(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1101,7 +1123,7 @@ async def alert_payment_review(
     try:
         await context.bot.send_message(
             services(context).settings.owner_id,
-            f"⚠️ Stars payment review: user <code>{user_id}</code>, "
+            f"{style_ui_label('⚠️ Stars payment review:')} user <code>{user_id}</code>, "
             f"charge <code>{esc(charge_id)}</code>, issue: {esc(reason)}. "
             "Check receipt / logs; if necessary use /refundstars USER_ID CHARGE_ID.",
             parse_mode=ParseMode.HTML,
@@ -1141,11 +1163,12 @@ async def on_successful_payment(update: Update, context: ContextTypes.DEFAULT_TY
     until = services(context).store.premium_until(uid)
     await render(
         update, context,
-        f"<b>✅ 30-day Premium active until {esc(expires_text(until))}</b>\n"
+        f"<b>{style_ui_label('✅ 30-day Premium active until')} "
+        f"{esc(expires_text(until))}</b>\n"
         f"Charge ID: <code>{esc(paid.telegram_payment_charge_id)}</code>\n"
         "Add all five bots via /childbots as admins in your linked channel. "
         "Then use /multireact CHANNEL_ID. Need help? /support.",
-        [[InlineKeyboardButton("🤖 Child Bot List", callback_data="childbots")]],
+        [[InlineKeyboardButton(style_ui_label("🤖 Child Bot List"), callback_data="childbots")]],
     )
 
 
@@ -1169,30 +1192,31 @@ async def cmd_support(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if not message:
         await render(
             update, context,
-            "Payment/help: <code>/support your question</code>. Owner ko message bheja jayega. "
-            "Bot tokens, card details ya passwords kabhi na bhejein.",
+            "Help and payments: <code>/support your question</code>. The owner will receive it. "
+            "Never send bot tokens, card details, or passwords.",
         )
         return
     if len(message) > 1000:
-        await render(update, context, "⚠️ Message 1000 characters se chhota rakhein.")
+        await render(update, context, "⚠️ Your message must be at most 1000 characters.")
         return
     last = context.application.bot_data.setdefault("last_support", {})
     now = time.monotonic()
     if uid != services(context).settings.owner_id and now - last.get(uid, -1000) < 60:
-        await render(update, context, "⏳ Support message 60 seconds mein ek baar bhej sakte hain.")
+        await render(update, context, "⏳ You can send one support request every 60 seconds.")
         return
     try:
         await context.bot.send_message(
             services(context).settings.owner_id,
-            f"📩 Support from <code>{uid}</code>:\n{esc(message)}\n\n"
+            f"{style_ui_label('📩 Support from')} <code>{uid}</code>:\n"
+            f"{esc(message)}\n\n"
             f"Reply: <code>/reply {uid} your response</code>",
             parse_mode=ParseMode.HTML,
         )
     except TelegramError:
-        await render(update, context, "⚠️ Owner tak message nahi pahucha. Owner ko bot /start karna hoga.")
+        await render(update, context, "⚠️ Your request could not reach the owner. The owner must start the bot with /start first.")
         return
     last[uid] = now
-    await render(update, context, "✅ Support request owner ko bhej di. Reply yahin aa sakta hai.")
+    await render(update, context, "✅ Your support request was sent to the owner. Any reply will appear here.")
 
 
 async def cmd_reply(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1205,12 +1229,14 @@ async def cmd_reply(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     target = int(args[0])
     text = " ".join(args[1:]).strip()
     if target <= 0 or len(text) > 1000:
-        await render(update, context, "⚠️ Valid user ID aur 1000-character response de.")
+        await render(update, context, "⚠️ Provide a valid user ID and a reply of at most 1000 characters.")
         return
     try:
-        await context.bot.send_message(target, f"📩 Owner reply:\n{esc(text)}", parse_mode=ParseMode.HTML)
+        await context.bot.send_message(
+            target, f"{style_ui_label('📩 Owner reply:')}\n{esc(text)}", parse_mode=ParseMode.HTML
+        )
     except TelegramError:
-        await render(update, context, "⚠️ User ko message deliver nahi ho paya.")
+        await render(update, context, "⚠️ Could not deliver the reply to that user.")
         return
     await render(update, context, "✅ Reply sent.")
 
@@ -1227,7 +1253,7 @@ async def cmd_grantpremium(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     uid = int(args[0])
     days = int(args[1]) if len(args) == 2 else PREMIUM_DAYS
     if uid <= 0 or not 1 <= days <= 365:
-        await render(update, context, "⚠️ User ID positive aur 1–365 days zaroori hai.")
+        await render(update, context, "⚠️ Enter a positive user ID and a duration from 1 to 365 days.")
         return
     until = services(context).store.grant_manual(uid, days, int(time.time()))
     await render(update, context, f"✅ Manual Premium granted: {uid}, until {esc(expires_text(until))}.")
@@ -1262,32 +1288,32 @@ async def cmd_refundstars(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         charge_id = args[0]
         payment = services(context).store.payment(charge_id)
         if not payment or payment["refunded"]:
-            await render(update, context, "⚠️ Payment record nahi mila ya refunded hai. "
-                         "Untracked charge ho to /refundstars USER_ID CHARGE_ID use karein.")
+            await render(update, context, "⚠️ No payment record was found, or it has already been refunded. "
+                         "For an untracked charge, use /refundstars USER_ID CHARGE_ID.")
             return
         uid = payment["user_id"]
     elif len(args) == 2 and args[0].isdecimal() and int(args[0]) > 0:
         uid, charge_id = int(args[0]), args[1]
         payment = services(context).store.payment(charge_id)
         if payment and (payment["refunded"] or payment["user_id"] != uid):
-            await render(update, context, "⚠️ Stored payment already refunded ya user ID mismatch.")
+            await render(update, context, "⚠️ The stored payment was already refunded, or the user ID does not match.")
             return
     else:
-        await render(update, context, "Use <code>/refundstars CHARGE_ID</code> (tracked) ya "
+        await render(update, context, "Use <code>/refundstars CHARGE_ID</code> (tracked) or "
                      "<code>/refundstars USER_ID CHARGE_ID</code> (untracked, verify receipt first).")
         return
     if not charge_id or len(charge_id) > 150:
-        await render(update, context, "⚠️ Valid Telegram charge ID chahiye.")
+        await render(update, context, "⚠️ Provide a valid Telegram charge ID.")
         return
     try:
         refunded_ok = await context.bot.refund_star_payment(
             user_id=uid, telegram_payment_charge_id=charge_id
         )
     except TelegramError:
-        await render(update, context, "⚠️ Telegram refund reject hua; owner logs check karein.")
+        await render(update, context, "⚠️ Telegram rejected the refund. Check the owner logs.")
         return
     if not refunded_ok:
-        await render(update, context, "⚠️ Telegram ne refund confirm nahi kiya; access unchanged.")
+        await render(update, context, "⚠️ Telegram did not confirm the refund; access is unchanged.")
         return
     services(context).store.mark_refunded(charge_id)
     await render(update, context, f"✅ Stars refund confirmed for user {uid}.")
@@ -1299,14 +1325,14 @@ async def show_setup(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     await render(
         update,
         context,
-        "<b>➕ Channel setup</b>\n\n"
-        "1. Apne channel mein is bot ko <b>admin</b> banayein.\n"
-        "2. Channel settings mein <b>Reactions</b> enable karein.\n"
-        "3. Aap bhi us channel ke <b>admin/owner</b> hon.\n"
-        "4. Channel se koi existing post <b>forward karke isi private chat mein</b> bhejein.\n\n"
-        "Forward ka asli channel verify hoga. Setup ke baad us post par "
-        "test reaction lagane ki koshish hogi; aage ke naye posts auto-react honge.",
-        [[InlineKeyboardButton("⬅️ Home", callback_data="home")]],
+        f"<b>{style_ui_label('➕ Channel setup')}</b>\n\n"
+        "1. Make this bot an <b>admin</b> of your channel.\n"
+        "2. Enable <b>Reactions</b> in the channel settings.\n"
+        "3. You must also be a channel <b>admin or owner</b>.\n"
+        "4. <b>Forward an existing channel post to this private chat</b>.\n\n"
+        "The bot will verify the post's original channel and try a test reaction. "
+        "After setup, it will try to react to new posts automatically.",
+        [[InlineKeyboardButton(style_ui_label("⬅️ Home"), callback_data="home")]],
     )
 
 
@@ -1324,14 +1350,14 @@ async def private_message(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         row = authorized_channel(context, update.effective_user.id, chat_id)
         if not row or not premium_active(context, row["owner_user_id"]):
             context.user_data.pop("awaiting_multi_custom", None)
-            await render(update, context, "⚠️ Linked channel/Premium unavailable; /setmulti se dobara try karein.")
+            await render(update, context, "⚠️ The linked channel or Premium access is unavailable. Try /setmulti again.")
             return
         token = custom_token_from_message(update.message)
         if not token:
             await render(
                 update, context,
-                "⚠️ Sirf ek Telegram custom emoji alag message mein bhejein, "
-                "ya <code>custom:NUMERIC_ID</code> bhejein. Plain 💫/💓 supported nahi.",
+                "⚠️ Send one Telegram custom emoji in a separate message, or send "
+                "<code>custom:NUMERIC_ID</code>. Plain 💫/💓 are not supported.",
             )
             return
         tokens = list(configured_multi_tokens(row))
@@ -1344,13 +1370,13 @@ async def private_message(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             and not context.user_data.get("awaiting_channel")):
         await render(
             update, context,
-            f"✨ Effect ID: <code>{esc(update.message.effect_id)}</code>\n"
-            "Is message ko reply karke <code>/seteffect</code> bhejein, "
-            "ya ID ko <code>/seteffect ID</code> mein use karein.",
+            f"{style_ui_label('✨ Effect ID:')} <code>{esc(update.message.effect_id)}</code>\n"
+            "Reply to this message with <code>/seteffect</code>, or use the ID "
+            "in <code>/seteffect ID</code>.",
         )
         return
     if not context.user_data.get("awaiting_channel"):
-        await render(update, context, "Channel jodne ke liye pehle /setchannel bhejein.")
+        await render(update, context, "Send /setchannel first to link a channel.")
         return
     if not await require_access(update, context):
         return
@@ -1359,8 +1385,8 @@ async def private_message(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await render(
             update,
             context,
-            "⚠️ Yeh channel se forwarded post nahi hai. "
-            "Apne channel ki original post ko Forward karke yahan bhejein.",
+            "⚠️ This is not a forwarded channel post. "
+            "Forward an original post from your channel to this chat.",
         )
         return
 
@@ -1370,22 +1396,22 @@ async def private_message(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     try:
         chat = await context.bot.get_chat(chat_id)
         if chat.type != ChatType.CHANNEL:
-            await render(update, context, "⚠️ Sirf Telegram channels supported hain.")
+            await render(update, context, "⚠️ Only Telegram channels are supported.")
             return
         bot_member = await context.bot.get_chat_member(chat_id, context.bot.id)
         if not is_admin(bot_member):
-            await render(update, context, "⚠️ Pehle bot ko is channel mein admin banayein.")
+            await render(update, context, "⚠️ Make this bot an admin of the channel first.")
             return
         user_member = await context.bot.get_chat_member(chat_id, uid)
         if not is_admin(user_member):
-            await render(update, context, "⚠️ Aapko bhi is channel ka admin/owner hona zaroori hai.")
+            await render(update, context, "⚠️ You must also be an admin or owner of this channel.")
             return
     except TelegramError as error:
         LOG.info("Channel setup verification failed for %s: %s", chat_id, type(error).__name__)
         await render(
             update,
             context,
-            "⚠️ Channel verify nahi hua. Bot ko channel admin banayein aur dobara forward karein.",
+            "⚠️ Could not verify the channel. Make this bot an admin and forward the post again.",
         )
         return
 
@@ -1394,8 +1420,8 @@ async def private_message(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await render(
             update,
             context,
-            "⚠️ Is channel mein standard emoji reactions disabled hain. "
-            "Kam se kam ek standard reaction enable karke post dobara forward karein.",
+            "⚠️ Standard emoji reactions are disabled in this channel. "
+            "Enable at least one standard reaction and forward the post again.",
         )
         return
     previous = state.store.channel(chat_id)
@@ -1407,15 +1433,15 @@ async def private_message(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             await render(
                 update,
                 context,
-                "⚠️ Channel kisi aur account se linked hai. Bot owner se help lein.",
+                "⚠️ This channel is linked to another account. Contact the bot owner for help.",
             )
             return
         if is_admin(old_admin):
             await render(
                 update,
                 context,
-                "⚠️ Channel pehle se kisi doosre admin se linked hai. "
-                "Unse unlink karwayein ya bot owner se help lein.",
+                "⚠️ This channel is already linked to another admin. "
+                "Ask that admin to unlink it, or contact the bot owner.",
             )
             return
         transfer = True  # Former linked admin has lost channel admin access.
@@ -1430,10 +1456,10 @@ async def private_message(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         chat_id, uid, chat.title or origin.chat.title or str(chat_id), emoji,
         allow_transfer=transfer,
     ):
-        await render(update, context, "⚠️ Channel kisi aur admin se linked hai.")
+        await render(update, context, "⚠️ This channel is linked to another admin.")
         return
     context.user_data.pop("awaiting_channel", None)
-    status = "✅ Setup post par test reaction lag gaya."
+    status = "✅ A test reaction was added to the setup post."
     try:
         await context.bot.set_message_reaction(
             chat_id=chat_id,
@@ -1443,17 +1469,17 @@ async def private_message(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     except TelegramError as error:
         LOG.warning("Setup reaction failed chat=%s post=%s: %s", chat_id, origin.message_id, type(error).__name__)
         status = (
-            "⚠️ Test reaction nahi laga. Channel mein reactions aur emoji permissions "
-            "check karein. Naye posts par bot koshish karta rahega."
+            "⚠️ The test reaction failed. Check channel reactions and the allowed emoji. "
+            "The bot will keep trying on new posts."
         )
     await render(
         update,
         context,
-        f"<b>✅ Channel linked: {esc(chat.title or chat_id)}</b>\n"
+        f"<b>{style_ui_label('✅ Channel linked:')} {esc(chat.title or chat_id)}</b>\n"
         f"ID: <code>{chat_id}</code> · Reaction: {esc(emoji)}\n\n{status}",
         [
-            [InlineKeyboardButton("🎛 Channel Settings", callback_data=f"channel:{chat_id}")],
-            [InlineKeyboardButton("🏠 Home", callback_data="home")],
+            [InlineKeyboardButton(style_ui_label("🎛 Channel Settings"), callback_data=f"channel:{chat_id}")],
+            [InlineKeyboardButton(style_ui_label("🏠 Home"), callback_data="home")],
         ],
     )
 
@@ -1465,10 +1491,10 @@ async def show_channels(
     if not rows:
         await render(
             update, context,
-            "Abhi koi channel linked nahi hai. /setchannel se shuru karein.",
+            "No channels are linked yet. Use /setchannel to get started.",
             [
-                [InlineKeyboardButton("➕ Set Channel", callback_data="add")],
-                [InlineKeyboardButton("🏠 Home", callback_data="home")],
+                [InlineKeyboardButton(style_ui_label("➕ Set Channel"), callback_data="add")],
+                [InlineKeyboardButton(style_ui_label("🏠 Home"), callback_data="home")],
             ],
         )
         return
@@ -1483,14 +1509,15 @@ async def show_channels(
     ]
     buttons.extend(
         [
-            [InlineKeyboardButton("➕ Add Channel", callback_data="add")],
-            [InlineKeyboardButton("🏠 Home", callback_data="home")],
+            [InlineKeyboardButton(style_ui_label("➕ Add Channel"), callback_data="add")],
+            [InlineKeyboardButton(style_ui_label("🏠 Home"), callback_data="home")],
         ]
     )
     await render(
         update, context,
         (esc(note) + "\n\n" if note else "")
-        + f"<b>📋 Linked channels ({len(rows)})</b>\nChannel select karke controls dekhein.",
+        + f"<b>{style_ui_label('📋 Linked channels')} ({len(rows)})</b>\n"
+        "Select a channel to view its controls.",
         buttons,
     )
 
@@ -1505,23 +1532,25 @@ async def show_channel(
 ) -> None:
     chat_id = row["chat_id"]
     buttons = [
-        [InlineKeyboardButton("🎭 Change Reaction", callback_data=f"picker:{chat_id}")],
-        [InlineKeyboardButton("🎨 5 Extra Emojis (Premium)", callback_data=f"multiemoji:{chat_id}")],
+        [InlineKeyboardButton(style_ui_label("🎭 Change Reaction"), callback_data=f"picker:{chat_id}")],
+        [InlineKeyboardButton(style_ui_label("🎨 5 Extra Emojis (Premium)"), callback_data=f"multiemoji:{chat_id}")],
         [
             InlineKeyboardButton(
-                "⏸ Pause" if row["enabled"] else "▶️ Resume",
+                style_ui_label("⏸ Pause" if row["enabled"] else "▶️ Resume"),
                 callback_data=f"active:{chat_id}:{0 if row['enabled'] else 1}",
             )
         ],
         [
             InlineKeyboardButton(
-                "🛑 Disable Multi React" if row["multi_enabled"] else "😍 Enable Multi React",
+                style_ui_label(
+                    "🛑 Disable Multi React" if row["multi_enabled"] else "😍 Enable Multi React"
+                ),
                 callback_data=f"multi:{chat_id}:{0 if row['multi_enabled'] else 1}",
             )
         ],
-        [InlineKeyboardButton("⭐ Premium / Child Bots", callback_data="premium")],
-        [InlineKeyboardButton("🗑 Remove Channel", callback_data=f"removeask:{chat_id}")],
-        [InlineKeyboardButton("⬅️ My Channels", callback_data="channels")],
+        [InlineKeyboardButton(style_ui_label("⭐ Premium / Child Bots"), callback_data="premium")],
+        [InlineKeyboardButton(style_ui_label("🗑 Remove Channel"), callback_data=f"removeask:{chat_id}")],
+        [InlineKeyboardButton(style_ui_label("⬅️ My Channels"), callback_data="channels")],
     ]
     owner_line = (
         f"\nLinked user: <code>{row['owner_user_id']}</code>"
@@ -1552,7 +1581,7 @@ async def change_multi(
     state = services(context)
     row = authorized_channel(context, uid, chat_id)
     if not row:
-        await render(update, context, "⚠️ Channel aapke account se linked nahi hai.")
+        await render(update, context, "⚠️ This channel is not linked to your account.")
         return
     if not enabled:
         state.store.set_multi_enabled(chat_id, uid, False, superuser=uid == state.settings.owner_id)
@@ -1563,16 +1592,16 @@ async def change_multi(
         return
     bots = children(context)
     if len(bots) != MAX_CHILD_BOTS:
-        await render(update, context, "⚠️ Owner ko pehle paanch child bots configure karne honge.")
+        await render(update, context, "⚠️ The owner must configure all five child bots first.")
         return
     try:
         primary = await context.bot.get_chat_member(chat_id, context.bot.id)
         if not is_admin(primary):
-            await render(update, context, "⚠️ Main bot channel admin nahi hai.")
+            await render(update, context, "⚠️ The main bot is not a channel admin.")
             return
         registrant = await context.bot.get_chat_member(chat_id, row["owner_user_id"])
         if not is_admin(registrant):
-            await render(update, context, "⚠️ Linked user ab channel admin nahi hai.")
+            await render(update, context, "⚠️ The linked user is no longer a channel admin.")
             return
         missing = []
         for child in bots:
@@ -1580,20 +1609,20 @@ async def change_multi(
             if not is_admin(member):
                 missing.append("@" + child.username)
     except TelegramError:
-        await render(update, context, "⚠️ Channel/bot admins verify nahi hue. Phir try karein.")
+        await render(update, context, "⚠️ Could not verify the channel or bot admins. Please try again.")
         return
     if missing:
         await render(
             update, context,
-            "⚠️ Pehle yeh child bots channel admin banayein: "
-            + esc(", ".join(missing)) + "\n/childbots se list dekhein.",
-            [[InlineKeyboardButton("🤖 Child Bot List", callback_data="childbots")]],
+            "⚠️ Make these child bots channel admins first: "
+            + esc(", ".join(missing)) + "\nSee /childbots for the full list.",
+            [[InlineKeyboardButton(style_ui_label("🤖 Child Bot List"), callback_data="childbots")]],
         )
         return
     state.store.set_multi_enabled(chat_id, uid, True, superuser=uid == state.settings.owner_id)
     await show_channel(
         update, context, state.store.channel(chat_id),
-        note="✅ Multi React ON. Naye posts par up to five extra BOT reactions try honge.",
+        note="✅ Multi React is ON. Up to five extra bot reactions will be tried on new posts.",
     )
 
 
@@ -1616,7 +1645,7 @@ async def cmd_multireact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if len(rows) == 1:
         await change_multi(update, context, rows[0]["chat_id"], enabled)
     else:
-        await show_channels(update, context, note="Channel select karke Multi React ON/OFF dabayein.")
+        await show_channels(update, context, note="Select a channel, then use its Multi React controls.")
 
 
 async def show_multi_reactions(
@@ -1634,26 +1663,28 @@ async def show_multi_reactions(
     ]
     buttons = [
         [InlineKeyboardButton(
-            f"{slot + 1}. {multi_label(token, row['emoji'])}",
+            f"{slot + 1}. {multi_button_label(token, row['emoji'])}",
             callback_data=f"multislot:{row['chat_id']}:{slot}",
         )]
         for slot, token in enumerate(tokens)
     ]
     buttons.extend([
-        [InlineKeyboardButton("↩️ All use main emoji", callback_data=f"multireset:{row['chat_id']}")],
-        [InlineKeyboardButton("⬅️ Channel Settings", callback_data=f"channel:{row['chat_id']}")],
+        [InlineKeyboardButton(style_ui_label("↩️ All use main emoji"), callback_data=f"multireset:{row['chat_id']}")],
+        [InlineKeyboardButton(style_ui_label("⬅️ Channel Settings"), callback_data=f"channel:{row['chat_id']}")],
     ])
     await render(
         update, context,
         (esc(note) + "\n\n" if note else "")
-        + f"<b>🎨 Five extra BOT emojis · {esc(row['title'])}</b>\n"
+        + f"<b>{style_ui_label('🎨 Five extra BOT emojis')} · {esc(row['title'])}</b>\n"
         + "\n".join(lines)
-        + "\n\nHar child bot apne slot ka <b>ek</b> reaction try karega. "
-        "Main bot ka emoji alag /setreaction se set hota hai. "
-        "Slot par tap karke standard emoji choose karein ya Telegram custom emoji bhejein. "
-        "Custom reaction sirf tab chalega jab channel allow kare ya post par pehle se ho. "
-        "Ek saath set: <code>/setmulti 😍 ❤️ 🥰 🤩 💘</code> "
-        "(multiple channels: pehle CHANNEL_ID). Plain 💫/💓 standard reactions nahi hain.",
+        + "\n\nEach child bot tries <b>one</b> reaction from its own slot. "
+        "Set the main bot's reaction separately with /setreaction. "
+        "Tap a slot to choose a standard emoji or provide a Telegram custom emoji. "
+        "A custom reaction works only if the channel allows it or it is already "
+        "present on the post. Set all five at once: "
+        "<code>/setmulti 😍 ❤️ 🥰 🤩 💘</code> "
+        "(for multiple channels, include CHANNEL_ID first). "
+        "Plain 💫/💓 are not standard reactions.",
         buttons,
     )
 
@@ -1669,10 +1700,10 @@ async def show_multi_slot(
         primary = await context.bot.get_chat_member(row["chat_id"], context.bot.id)
         registrant = await context.bot.get_chat_member(row["chat_id"], row["owner_user_id"])
     except TelegramError:
-        await render(update, context, "⚠️ Channel/admin status check nahi hua; retry karein.")
+        await render(update, context, "⚠️ Could not check the channel or admin status. Please try again.")
         return
     if not is_admin(primary) or not is_admin(registrant):
-        await render(update, context, "⚠️ Main bot aur registered user dono channel admins hone chahiye.")
+        await render(update, context, "⚠️ The main bot and the registered user must both be channel admins.")
         return
     allowed = normal_reactions(chat)
     choices = [e for e in FAVORITES if e in SUPPORTED_REACTIONS and (allowed is None or e in allowed)]
@@ -1686,16 +1717,17 @@ async def show_multi_slot(
         for start in range(0, len(choices), 4)
     ]
     buttons.extend([
-        [InlineKeyboardButton("✨ Send custom emoji / ID", callback_data=f"multicustom:{row['chat_id']}:{slot}")],
-        [InlineKeyboardButton("↩️ Use main emoji", callback_data=f"multiset:{row['chat_id']}:{slot}:m")],
-        [InlineKeyboardButton("⬅️ All 5 slots", callback_data=f"multiemoji:{row['chat_id']}")],
+        [InlineKeyboardButton(style_ui_label("✨ Send custom emoji / ID"), callback_data=f"multicustom:{row['chat_id']}:{slot}")],
+        [InlineKeyboardButton(style_ui_label("↩️ Use main emoji"), callback_data=f"multiset:{row['chat_id']}:{slot}:m")],
+        [InlineKeyboardButton(style_ui_label("⬅️ All 5 slots"), callback_data=f"multiemoji:{row['chat_id']}")],
     ])
     await render(
         update, context,
-        f"<b>Child bot #{slot + 1} · {esc(row['title'])}</b>\n"
-        "Is bot ke liye allowed standard emoji choose karein. Custom emoji ke liye "
-        "alag button dabayein; Telegram/channel permission zaroori hai. "
-        "Aur supported emoji ke liye <code>/setmulti</code> use karein.",
+        f"<b>{style_ui_label('Child bot')} #{slot + 1} · {esc(row['title'])}</b>\n"
+        "Choose a standard emoji allowed in this channel for this child bot. "
+        "To use a custom emoji, tap the dedicated button; Telegram and channel "
+        "permissions still apply. You can also use <code>/setmulti</code> for "
+        "other supported reactions.",
         buttons,
     )
 
@@ -1707,24 +1739,24 @@ async def save_multi_reactions(
     state = services(context)
     row = authorized_channel(context, uid, chat_id)
     if not row:
-        await render(update, context, "⚠️ Yeh channel aapke account se linked nahi hai.")
+        await render(update, context, "⚠️ This channel is not linked to your account.")
         return False
     if not premium_active(context, row["owner_user_id"]):
         await show_premium(update, context)
         return False
     parsed = [parse_multi_token(token) for token in tokens]
     if len(parsed) != MAX_CHILD_BOTS or any(token is None for token in parsed):
-        await render(update, context, "⚠️ Paanch valid reaction emojis / custom IDs chahiye.")
+        await render(update, context, "⚠️ Provide exactly five valid reaction emojis or custom IDs.")
         return False
     try:
         primary = await context.bot.get_chat_member(chat_id, context.bot.id)
         registrant = await context.bot.get_chat_member(chat_id, row["owner_user_id"])
         chat = await context.bot.get_chat(chat_id)
     except TelegramError:
-        await render(update, context, "⚠️ Channel/admin access verify nahi hua; retry karein.")
+        await render(update, context, "⚠️ Could not verify channel or admin access. Please try again.")
         return False
     if not is_admin(primary) or not is_admin(registrant):
-        await render(update, context, "⚠️ Main bot aur registered user dono channel admins hone chahiye.")
+        await render(update, context, "⚠️ The main bot and the registered user must both be channel admins.")
         return False
     allowed = normal_reactions(chat)
     invalid = [
@@ -1734,17 +1766,17 @@ async def save_multi_reactions(
         and (row["emoji"] if token == "main" else token) not in allowed
     ]
     if invalid:
-        await render(update, context, "⚠️ Channel mein yeh standard emoji allowed nahi: "
-                     + esc(", ".join(invalid)) + ". Channel reactions settings check karein.")
+        await render(update, context, "⚠️ These standard emojis are not allowed in the channel: "
+                     + esc(", ".join(invalid)) + ". Check the channel reaction settings.")
         return False
     if not state.store.set_multi_reactions(
         chat_id, uid, parsed, superuser=uid == state.settings.owner_id
     ):
-        await render(update, context, "⚠️ Channel settings save nahi hue; dobara try karein.")
+        await render(update, context, "⚠️ Could not save the channel settings. Please try again.")
         return False
     custom_note = (
-        " Custom emojis Telegram/channel allow kare ya post par pehle se hon; "
-        "warna un slots par reaction fail ho sakta hai."
+        " Custom emojis must be allowed by Telegram and the channel, or already "
+        "present on the post; otherwise those reactions may fail."
         if any(token.startswith("custom:") for token in parsed) else ""
     )
     await show_multi_reactions(
@@ -1764,13 +1796,13 @@ async def cmd_setmulti(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         if len(args) == 1:
             row = authorized_channel(context, update.effective_user.id, int(args[0]))
             if not row:
-                await render(update, context, "⚠️ Channel linked nahi hai.")
+                await render(update, context, "⚠️ This channel is not linked.")
                 return
             await show_multi_reactions(update, context, row)
         elif len(rows) == 1:
             await show_multi_reactions(update, context, rows[0])
         else:
-            await show_channels(update, context, note="Channel select karke 5 Extra Emojis dabayein.")
+            await show_channels(update, context, note="Select a channel, then tap 5 Extra Emojis.")
         return
     if len(args) == 6 and args[0].lstrip("-").isdigit():
         chat_id, raw = int(args[0]), args[1:]
@@ -1782,7 +1814,7 @@ async def cmd_setmulti(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             "Format (one channel): <code>/setmulti 😍 ❤️ 🥰 🤩 💘</code>\n"
             "Multiple channels: <code>/setmulti CHANNEL_ID 😍 ❤️ 🥰 🤩 💘</code>\n"
             "Custom emoji: <code>custom:NUMERIC_ID</code>, Telegram custom emoji "
-            "entity, ya inline slot se custom emoji message bhejein.",
+            "entity, or use the inline slot to send a custom emoji.",
         )
         return
     parsed = [parse_multi_token(token) for token in raw]
@@ -1790,9 +1822,9 @@ async def cmd_setmulti(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         invalid = [value for value, token in zip(raw, parsed) if token is None]
         await render(
             update, context,
-            "⚠️ Standard Telegram reaction nahi: " + esc(", ".join(invalid)) + ". "
-            "💫/💓 plain emoji supported nahi; channel-allowed custom emoji ke "
-            "liye inline slot se emoji bhejein ya custom:ID use karein.",
+            "⚠️ Not supported as standard Telegram reactions: " + esc(", ".join(invalid)) + ". "
+            "Plain 💫/💓 are not supported. For an allowed custom emoji, "
+            "send it via an inline slot or use custom:ID.",
         )
         return
     await save_multi_reactions(update, context, chat_id, parsed)
@@ -1809,7 +1841,7 @@ async def handle_multi_callback(
     chat_id = int(parts[1])
     row = authorized_channel(context, update.effective_user.id, chat_id)
     if not row:
-        await render(update, context, "⚠️ Channel linked nahi hai ya access nahi hai.")
+        await render(update, context, "⚠️ This channel is not linked, or you do not have access.")
         return
     if not premium_active(context, row["owner_user_id"]):
         await show_premium(update, context)
@@ -1829,13 +1861,14 @@ async def handle_multi_callback(
             context.user_data["awaiting_multi_custom"] = (chat_id, slot)
             await render(
                 update, context,
-                f"<b>✨ Child bot #{slot + 1} custom emoji</b>\n"
-                "Ek Telegram <b>custom emoji</b> alag message mein bhejein, "
-                "ya <code>custom:NUMERIC_ID</code> / numeric ID bhejein. "
-                "Sirf plain 💫 ya 💓 text kaam nahi karega; Telegram custom emoji "
-                "entity/ID chahiye. Reaction tabhi lagega jab channel us ID ko allow "
-                "kare ya wo post par pehle se maujood ho.",
-                [[InlineKeyboardButton("⬅️ All 5 slots", callback_data=f"multiemoji:{chat_id}")]],
+                f"<b>{style_ui_label('✨ Child bot')} #{slot + 1} "
+                f"{style_ui_label('custom emoji')}</b>\n"
+                "Send one Telegram <b>custom emoji</b> in a separate message, "
+                "or send <code>custom:NUMERIC_ID</code> (or just the numeric ID). "
+                "Plain 💫 or 💓 text will not work; a real Telegram custom emoji "
+                "entity or ID is required. The reaction works only if the channel "
+                "allows that ID or it is already present on the post.",
+                [[InlineKeyboardButton(style_ui_label("⬅️ All 5 slots"), callback_data=f"multiemoji:{chat_id}")]],
             )
         else:
             choice = parts[3]
@@ -1858,16 +1891,16 @@ async def show_picker(update: Update, context: ContextTypes.DEFAULT_TYPE, row) -
         chat = await context.bot.get_chat(row["chat_id"])
         bot_member = await context.bot.get_chat_member(row["chat_id"], context.bot.id)
         if not is_admin(bot_member):
-            await render(update, context, "⚠️ Bot ab channel ka admin nahi hai.")
+            await render(update, context, "⚠️ The bot is no longer a channel admin.")
             return
     except TelegramError:
-        await render(update, context, "⚠️ Channel access nahi mila. Bot admin access check karein.")
+        await render(update, context, "⚠️ Cannot access the channel. Check this bot’s admin permissions.")
         return
     allowed = normal_reactions(chat)
     favorites = [e for e in FAVORITES if e in SUPPORTED_REACTIONS and (allowed is None or e in allowed)]
     choices = favorites or ([] if allowed is None else allowed[:12])
     if not choices:
-        await render(update, context, "⚠️ Channel mein standard reactions enable karein.")
+        await render(update, context, "⚠️ Enable standard reactions in the channel.")
         return
     buttons: list[list[InlineKeyboardButton]] = []
     for start in range(0, len(choices), 4):
@@ -1877,11 +1910,11 @@ async def show_picker(update: Update, context: ContextTypes.DEFAULT_TYPE, row) -
                 for emoji in choices[start:start + 4]
             ]
         )
-    buttons.append([InlineKeyboardButton("⬅️ Back", callback_data=f"channel:{row['chat_id']}")])
+    buttons.append([InlineKeyboardButton(style_ui_label("⬅️ Back"), callback_data=f"channel:{row['chat_id']}")])
     await render(
         update, context,
-        f"<b>🎭 {esc(row['title'])}</b>\nReaction select karein. "
-        "Aur supported emoji ke liye /setreaction &lt;emoji&gt; bhej sakte hain.",
+        f"<b>🎭 {esc(row['title'])}</b>\nSelect a reaction. "
+        "You can also send /setreaction &lt;emoji&gt; for any supported emoji.",
         buttons,
     )
 
@@ -1902,10 +1935,11 @@ async def choose_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE, em
             ]
             for row in rows
         ]
-        buttons.append([InlineKeyboardButton("⬅️ Home", callback_data="home")])
+        buttons.append([InlineKeyboardButton(style_ui_label("⬅️ Home"), callback_data="home")])
         await render(
             update, context,
-            f"<b>Reaction: {esc(emoji)}</b>\nKis channel mein set karna hai?",
+            f"<b>{style_ui_label('Reaction:')} {esc(emoji)}</b>\n"
+            "Which channel should use it?",
             buttons,
         )
 
@@ -1917,38 +1951,38 @@ async def apply_reaction(
     state = services(context)
     row = authorized_channel(context, uid, chat_id)
     if not row:
-        await render(update, context, "⚠️ Yeh channel aapke account se linked nahi hai.")
+        await render(update, context, "⚠️ This channel is not linked to your account.")
         return
     emoji = normalize_emoji(emoji)
     if emoji not in SUPPORTED_REACTIONS:
-        await render(update, context, "⚠️ Telegram ka supported standard reaction emoji bhejein.")
+        await render(update, context, "⚠️ Send a standard reaction emoji supported by Telegram.")
         return
     try:
         bot_member = await context.bot.get_chat_member(chat_id, context.bot.id)
         if not is_admin(bot_member):
-            await render(update, context, "⚠️ Bot ko dobara channel admin banayein.")
+            await render(update, context, "⚠️ Make the bot a channel admin again.")
             return
         if uid != state.settings.owner_id:
             member = await context.bot.get_chat_member(chat_id, uid)
             if not is_admin(member):
-                await render(update, context, "⚠️ Aap ab channel admin nahi hain.")
+                await render(update, context, "⚠️ You are no longer a channel admin.")
                 return
         chat = await context.bot.get_chat(chat_id)
     except TelegramError:
-        await render(update, context, "⚠️ Channel/admin access verify nahi hua; baad mein retry karein.")
+        await render(update, context, "⚠️ Could not verify channel or admin access. Please try again later.")
         return
     allowed = normal_reactions(chat)
     if allowed is not None and emoji not in allowed:
         await render(
             update, context,
-            f"⚠️ Is channel mein {esc(emoji)} reaction allowed nahi hai. "
-            "Channel settings mein allow karein ya koi aur emoji choose karein.",
+            f"⚠️ The {esc(emoji)} reaction is not allowed in this channel. "
+            "Allow it in the channel settings or choose another emoji.",
         )
         return
     state.store.change_emoji(chat_id, uid, emoji, superuser=uid == state.settings.owner_id)
     await show_channel(
         update, context, state.store.channel(chat_id),
-        note=f"✅ Ab naye posts par {emoji} reaction lagega.",
+        note=f"✅ The bot will now try {emoji} on new posts.",
     )
 
 
@@ -1961,7 +1995,7 @@ async def cmd_setreaction(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         if len(rows) == 1:
             await show_picker(update, context, rows[0])
         else:
-            await show_channels(update, context, note="Channel select karke Change Reaction dabayein.")
+            await show_channels(update, context, note="Select a channel, then tap Change Reaction.")
         return
     if len(args) == 1 and normalize_emoji(args[0]) in SUPPORTED_REACTIONS:
         await choose_reaction(update, context, normalize_emoji(args[0]))
@@ -1974,9 +2008,9 @@ async def cmd_setreaction(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 return
     await render(
         update, context,
-        "Format: <code>/setreaction 🔥</code> ya "
+        "Use <code>/setreaction 🔥</code> or "
         "<code>/setreaction -1001234567890 🔥</code>. "
-        "Custom HTML tg-emoji IDs yahan use nahi hote.",
+        "Custom HTML tg-emoji IDs cannot be used here.",
     )
 
 
@@ -1987,21 +2021,21 @@ async def change_active(
     state = services(context)
     row = authorized_channel(context, uid, chat_id)
     if not row:
-        await render(update, context, "⚠️ Yeh channel aapke account se linked nahi hai.")
+        await render(update, context, "⚠️ This channel is not linked to your account.")
         return
     if enabled:
         try:
             bot_member = await context.bot.get_chat_member(chat_id, context.bot.id)
             if not is_admin(bot_member):
-                await render(update, context, "⚠️ Bot ko channel mein admin banayein.")
+                await render(update, context, "⚠️ Make this bot a channel admin.")
                 return
             if uid != state.settings.owner_id:
                 member = await context.bot.get_chat_member(chat_id, uid)
                 if not is_admin(member):
-                    await render(update, context, "⚠️ Aap channel admin nahi hain.")
+                    await render(update, context, "⚠️ You are not a channel admin.")
                     return
         except TelegramError:
-            await render(update, context, "⚠️ Channel/admin access verify nahi hua.")
+            await render(update, context, "⚠️ Could not verify channel or admin access.")
             return
     state.store.change_enabled(chat_id, uid, enabled, superuser=uid == state.settings.owner_id)
     await show_channel(
@@ -2017,7 +2051,7 @@ async def cmd_active(
         return
     args = context.args
     if len(args) > 1 or (args and not args[0].lstrip("-").isdigit()):
-        await render(update, context, "Format: <code>/pause [channel_id]</code> ya <code>/resume [channel_id]</code>.")
+        await render(update, context, "Use <code>/pause [channel_id]</code> or <code>/resume [channel_id]</code>.")
         return
     if args:
         await change_active(update, context, int(args[0]), enabled)
@@ -2026,7 +2060,7 @@ async def cmd_active(
     if len(rows) == 1:
         await change_active(update, context, rows[0]["chat_id"], enabled)
     else:
-        await show_channels(update, context, note="Channel select karke Pause/Resume dabayein.")
+        await show_channels(update, context, note="Select a channel, then tap Pause or Resume.")
 
 
 async def cmd_pause(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2040,15 +2074,15 @@ async def cmd_resume(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 async def confirm_remove(update: Update, context: ContextTypes.DEFAULT_TYPE, chat_id: int) -> None:
     row = authorized_channel(context, update.effective_user.id, chat_id)
     if not row:
-        await render(update, context, "⚠️ Channel linked nahi hai ya access nahi hai.")
+        await render(update, context, "⚠️ This channel is not linked, or you do not have access.")
         return
     await render(
         update, context,
-        f"<b>{esc(row['title'])}</b> ko unlink karna hai? "
-        "Iske baad naye posts par bot reaction nahi lagayega.",
+        f"Unlink <b>{esc(row['title'])}</b> from this bot? "
+        "New posts will no longer receive this bot's reaction.",
         [
-            [InlineKeyboardButton("🗑 Yes, Remove", callback_data=f"remove:{chat_id}")],
-            [InlineKeyboardButton("⬅️ Cancel", callback_data=f"channel:{chat_id}")],
+            [InlineKeyboardButton(style_ui_label("🗑 Yes, Remove"), callback_data=f"remove:{chat_id}")],
+            [InlineKeyboardButton(style_ui_label("⬅️ Cancel"), callback_data=f"channel:{chat_id}")],
         ],
     )
 
@@ -2067,13 +2101,13 @@ async def cmd_removechannel(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     if len(rows) == 1:
         await confirm_remove(update, context, rows[0]["chat_id"])
     else:
-        await show_channels(update, context, note="Channel select karke Remove Channel dabayein.")
+        await show_channels(update, context, note="Select a channel, then tap Remove Channel.")
 
 
 async def owner_only(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     if update.effective_user.id == services(context).settings.owner_id:
         return True
-    await render(update, context, "⛔ Sirf bot owner yeh setting change kar sakta hai.")
+    await render(update, context, "⛔ Only the bot owner can change this setting.")
     return False
 
 
@@ -2085,26 +2119,26 @@ async def cmd_addforce(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             update, context,
             "Public: <code>/addforce @channel</code>\n"
             "Private: <code>/addforce -1001234567890 https://t.me/+invite</code>\n"
-            "Bot pehle channel mein admin hona chahiye.",
+            "The bot must already be a channel admin.",
         )
         return
     reference = context.args[0]
     if not (reference.startswith("@") or reference.lstrip("-").isdigit()):
-        await render(update, context, "⚠️ Channel ka @username ya numeric -100… ID bhejein.")
+        await render(update, context, "⚠️ Provide the channel @username or its numeric -100… ID.")
         return
     try:
         ref = int(reference) if reference.lstrip("-").isdigit() else reference
         chat = await context.bot.get_chat(ref)
         if chat.type != ChatType.CHANNEL:
-            await render(update, context, "⚠️ Force subscribe ke liye Telegram channel chahiye.")
+            await render(update, context, "⚠️ A Telegram channel is required for mandatory subscription.")
             return
         member = await context.bot.get_chat_member(chat.id, context.bot.id)
         if not is_admin(member):
-            await render(update, context, "⚠️ Bot ko is force-sub channel mein admin banayein.")
+            await render(update, context, "⚠️ Make the bot an admin of this required channel.")
             return
     except TelegramError as error:
         LOG.info("Could not configure force channel %s: %s", reference, type(error).__name__)
-        await render(update, context, "⚠️ Channel nahi mila; bot admin hai ya nahi check karein.")
+        await render(update, context, "⚠️ Could not find the channel. Check that the bot is an admin.")
         return
     url = context.args[1] if len(context.args) == 2 else (
         f"https://t.me/{chat.username}" if chat.username else ""
@@ -2112,15 +2146,15 @@ async def cmd_addforce(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if not valid_join_url(url):
         await render(
             update, context,
-            "⚠️ Valid HTTPS t.me join link chahiye. Private channel ke liye "
-            "<code>/addforce -100... https://t.me/+invite</code> use karein.",
+            "⚠️ Provide a valid HTTPS t.me join link. For a private channel, use "
+            "<code>/addforce -100... https://t.me/+invite</code>.",
         )
         return
     services(context).store.put_force_channel(chat.id, chat.title or str(chat.id), chat.username, url)
     await render(
         update, context,
-        f"✅ Force-sub channel set: <b>{esc(chat.title or chat.id)}</b>\n"
-        f"ID: <code>{chat.id}</code>. Ab /forces se list dekhein.",
+        f"✅ Required channel added: <b>{esc(chat.title or chat.id)}</b>\n"
+        f"ID: <code>{chat.id}</code>. Use /forces to view the list.",
     )
 
 
@@ -2129,16 +2163,16 @@ async def show_forces(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     buttons = [
         [
             InlineKeyboardButton("🔗 " + short_title(row["title"]), url=row["join_url"]),
-            InlineKeyboardButton("🗑", callback_data=f"forceask:{row['chat_id']}"),
+            InlineKeyboardButton(style_ui_label("🗑"), callback_data=f"forceask:{row['chat_id']}"),
         ]
         for row in rows
     ]
-    buttons.append([InlineKeyboardButton("⬅️ Owner Panel", callback_data="owner")])
+    buttons.append([InlineKeyboardButton(style_ui_label("⬅️ Owner Panel"), callback_data="owner")])
     await render(
         update, context,
-        f"<b>🔐 Force-sub channels: {len(rows)}</b>\n"
+        f"<b>{style_ui_label('🔐 Required channels:')} {len(rows)}</b>\n"
         "Add: <code>/addforce @channel</code>\n"
-        "Remove: <code>/delforce @channel</code> (ya 🗑 button).",
+        "Remove: <code>/delforce @channel</code> (or tap 🗑).",
         buttons,
     )
 
@@ -2152,14 +2186,14 @@ async def cmd_delforce(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if not await owner_only(update, context):
         return
     if len(context.args) != 1:
-        await render(update, context, "Format: <code>/delforce @channel</code> ya <code>/delforce -100…</code>.")
+        await render(update, context, "Use <code>/delforce @channel</code> or <code>/delforce -100…</code>.")
         return
     row = services(context).store.force_channel(context.args[0])
     if not row:
-        await render(update, context, "⚠️ Yeh force-sub channel list mein nahi mila.")
+        await render(update, context, "⚠️ This channel is not in the required-channel list.")
         return
     services(context).store.delete_force_channel(row["chat_id"])
-    await render(update, context, f"✅ Force-sub se hataya: <b>{esc(row['title'])}</b>.")
+    await render(update, context, f"✅ Removed from required channels: <b>{esc(row['title'])}</b>.")
 
 
 async def cmd_seteffect(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2177,16 +2211,16 @@ async def cmd_seteffect(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         if not effect_id:
             await render(
                 update, context,
-                "Pehle is bot ko Telegram effect laga hua message bhejein; "
-                "usi message ko reply karke <code>/seteffect</code> bhejein. "
-                "Ya <code>/seteffect EFFECT_ID</code> / <code>/seteffect off</code> use karein.",
+                "First send this bot a message that has a Telegram effect. "
+                "Reply to that message with <code>/seteffect</code>, or send "
+                "<code>/seteffect EFFECT_ID</code> or <code>/seteffect off</code>.",
             )
             return
     else:
-        await render(update, context, "Format: <code>/seteffect EFFECT_ID</code> ya <code>/seteffect off</code>.")
+        await render(update, context, "Use <code>/seteffect EFFECT_ID</code> or <code>/seteffect off</code>.")
         return
     if effect_id and (not effect_id.isdecimal() or len(effect_id) > 40):
-        await render(update, context, "⚠️ Effect ID numeric aur 40 characters se chhota hona chahiye.")
+        await render(update, context, "⚠️ The effect ID must be numeric and no longer than 40 characters.")
         return
     services(context).store.set_setting("celebration_effect_id", effect_id)
     context.application.bot_data.pop("bad_effect_id", None)
@@ -2194,7 +2228,7 @@ async def cmd_seteffect(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         update, context,
         (f"✅ Native effect ID saved: <code>{esc(effect_id)}</code>."
          if effect_id else "✅ Native effect OFF; flying emoji GIF fallback ON.")
-        + "\n<code>/effecttest</code> bhejkar result dekhein.",
+        + "\nSend <code>/effecttest</code> to preview the result.",
     )
 
 
@@ -2205,7 +2239,7 @@ async def cmd_effecttest(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await send_celebration(update, context)
     except TelegramError as error:
         LOG.warning("Owner celebration test failed: %s", type(error).__name__)
-        await render(update, context, "⚠️ Effect/GIF nahi bhej paya. Bot logs aur ID check karein.")
+        await render(update, context, "⚠️ Could not send the effect or GIF. Check the bot logs and effect ID.")
 
 
 async def show_owner(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2213,7 +2247,7 @@ async def show_owner(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     effect = celebration_effect_id(context)
     await render(
         update, context,
-        "<b>👑 Owner Panel</b>\n\n"
+        f"<b>{style_ui_label('👑 Owner Panel')}</b>\n\n"
         f"Required channels: {forced}\nLinked channels: {total}\nActive channels: {enabled}\n"
         f"Child bots online: {len(children(context))}/{MAX_CHILD_BOTS}\n"
         f"Celebration: {esc(effect) if effect else 'GIF fallback'}\n\n"
@@ -2223,11 +2257,11 @@ async def show_owner(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         "Effect: reply <code>/seteffect</code> to an effected message, "
         "or <code>/seteffect ID</code> / <code>/seteffect off</code>.",
         [
-            [InlineKeyboardButton("🔐 Force Channels", callback_data="forces")],
-            [InlineKeyboardButton("⭐ Premium Details", callback_data="premium")],
-            [InlineKeyboardButton("🎉 Test Celebration", callback_data="effecttest")],
-            [InlineKeyboardButton("📋 All Linked Channels", callback_data="channels")],
-            [InlineKeyboardButton("🏠 Home", callback_data="home")],
+            [InlineKeyboardButton(style_ui_label("🔐 Required Channels"), callback_data="forces")],
+            [InlineKeyboardButton(style_ui_label("⭐ Premium Details"), callback_data="premium")],
+            [InlineKeyboardButton(style_ui_label("🎉 Test Celebration"), callback_data="effecttest")],
+            [InlineKeyboardButton(style_ui_label("📋 All Linked Channels"), callback_data="channels")],
+            [InlineKeyboardButton(style_ui_label("🏠 Home"), callback_data="home")],
         ],
     )
 
@@ -2240,7 +2274,7 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     if not update.effective_chat or update.effective_chat.type != ChatType.PRIVATE:
-        await query.answer("Bot ko private chat mein use karein.", show_alert=True)
+        await query.answer("Use this bot in a private chat.", show_alert=True)
         return
     await query.answer()
     data = query.data or ""
@@ -2273,10 +2307,10 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             elif action == "forceask":
                 await render(
                     update, context,
-                    f"Force-sub se <b>{esc(row['title'])}</b> hatana hai?",
+                    f"Remove <b>{esc(row['title'])}</b> from the required channels?",
                     [
-                        [InlineKeyboardButton("🗑 Yes, Remove", callback_data=f"forcedel:{chat_id}")],
-                        [InlineKeyboardButton("⬅️ Cancel", callback_data="forces")],
+                        [InlineKeyboardButton(style_ui_label("🗑 Yes, Remove"), callback_data=f"forcedel:{chat_id}")],
+                        [InlineKeyboardButton(style_ui_label("⬅️ Cancel"), callback_data="forces")],
                     ],
                 )
             else:
@@ -2309,7 +2343,7 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         if len(rows) == 1:
             await show_picker(update, context, rows[0])
         else:
-            await show_channels(update, context, note="Channel select karke Change Reaction dabayein.")
+            await show_channels(update, context, note="Select a channel, then tap Change Reaction.")
     else:
         parts = data.split(":")
         if len(parts) not in (2, 3) or not parts[1].lstrip("-").isdigit():
@@ -2318,7 +2352,7 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         action, chat_id = parts[0], int(parts[1])
         row = authorized_channel(context, update.effective_user.id, chat_id)
         if not row:
-            await render(update, context, "⚠️ Channel linked nahi hai ya access nahi hai.")
+            await render(update, context, "⚠️ This channel is not linked, or you do not have access.")
             return
         if action == "channel" and len(parts) == 2:
             await show_channel(update, context, row)
@@ -2468,17 +2502,17 @@ async def post_init(application: Application) -> None:
         LOG.warning("Only %d/%d child bots ready; Stars checkout disabled", len(loaded), MAX_CHILD_BOTS)
     await application.bot.set_my_commands(
         [
-            BotCommand("start", "Start / verify subscription"),
-            BotCommand("setchannel", "Link a channel using a forwarded post"),
-            BotCommand("mychannels", "Your linked channels"),
-            BotCommand("setreaction", "Set main-bot emoji reaction"),
-            BotCommand("setmulti", "Choose five Premium bot emojis"),
-            BotCommand("premium", "Premium status and 100 Stars offer"),
-            BotCommand("childbots", "Five child bots to add as channel admins"),
-            BotCommand("multireact", "Enable/disable child-bot reactions"),
-            BotCommand("support", "Purchase help and refund requests"),
-            BotCommand("terms", "Premium purchase terms"),
-            BotCommand("help", "Commands and setup instructions"),
+            BotCommand("start", style_ui_label("Start / verify subscription")),
+            BotCommand("setchannel", style_ui_label("Link a channel using a forwarded post")),
+            BotCommand("mychannels", style_ui_label("Your linked channels")),
+            BotCommand("setreaction", style_ui_label("Set main-bot emoji reaction")),
+            BotCommand("setmulti", style_ui_label("Choose five Premium bot emojis")),
+            BotCommand("premium", style_ui_label("Premium status and 100 Stars offer")),
+            BotCommand("childbots", style_ui_label("Five child bots to add as channel admins")),
+            BotCommand("multireact", style_ui_label("Enable/disable child-bot reactions")),
+            BotCommand("support", style_ui_label("Purchase help and refund requests")),
+            BotCommand("terms", style_ui_label("Premium purchase terms")),
+            BotCommand("help", style_ui_label("Commands and setup instructions")),
         ]
     )
 
