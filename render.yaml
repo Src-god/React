@@ -1,0 +1,30 @@
+# Paid always-on Render Web Service. Free services sleep and cannot use disks.
+# Commit render.yaml, run.sh, bot.py, requirements.txt and README.md to your repo.
+# NEVER commit real config.js, .env, or bot tokens.
+# Alternative to env secrets: upload config.js as a Render Secret File and
+# REMOVE BOT_TOKEN/OWNER_ID/CHILD_BOT_TOKENS env vars so the file is used.
+services:
+  - type: web
+    name: telegram-reaction-bot
+    runtime: python
+    region: singapore
+    plan: 0.5c-512mb
+    numInstances: 1
+    buildCommand: pip install -r requirements.txt
+    # run.sh keeps just one poller; on child exit 137 (SIGKILL/possible OOM) it
+    # restarts with backoff. /healthz lets Render replace the whole instance.
+    startCommand: bash run.sh
+    healthCheckPath: /healthz
+    disk:
+      name: telegram-bot-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: OWNER_ID
+        sync: false
+      - key: CHILD_BOT_TOKENS
+        sync: false
+      - key: DB_PATH
+        value: /var/data/bot.sqlite3
